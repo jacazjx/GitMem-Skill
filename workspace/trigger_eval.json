@@ -1,0 +1,82 @@
+[
+  {
+    "query": "edit my config.yaml and make sure I can undo if something goes wrong",
+    "should_trigger": true
+  },
+  {
+    "query": "帮我改一下src/main.py，要是改坏了能回滚",
+    "should_trigger": true
+  },
+  {
+    "query": "refactor the authentication module but keep a checkpoint in case we need to revert",
+    "should_trigger": true
+  },
+  {
+    "query": "I think your last edit broke the tests, show me what changed and let me restore the working version",
+    "should_trigger": true
+  },
+  {
+    "query": "这个文件你改了好几次了，每次都有问题，让我看看之前的版本",
+    "should_trigger": true
+  },
+  {
+    "query": "edit this file safely so I can compare versions later",
+    "should_trigger": true
+  },
+  {
+    "query": "go back to the version from 3 edits ago, the code was working then",
+    "should_trigger": true
+  },
+  {
+    "query": "create a safe checkpoint before you start refactoring the database layer",
+    "should_trigger": true
+  },
+  {
+    "query": "the agent keeps making changes that break things, how do I see recent edits and rollback?",
+    "should_trigger": true
+  },
+  {
+    "query": "undo your last change to package.json, it broke the build",
+    "should_trigger": true
+  },
+  {
+    "query": "commit these changes to git with a descriptive message",
+    "should_trigger": false
+  },
+  {
+    "query": "show me the git log for this repository",
+    "should_trigger": false
+  },
+  {
+    "query": "create a new branch called feature/auth and push it to origin",
+    "should_trigger": false
+  },
+  {
+    "query": "merge the develop branch into main",
+    "should_trigger": false
+  },
+  {
+    "query": "帮我看看这个bug怎么修，代码在这里",
+    "should_trigger": false
+  },
+  {
+    "query": "review my code and suggest improvements",
+    "should_trigger": false
+  },
+  {
+    "query": "write a unit test for the calculate function",
+    "should_trigger": false
+  },
+  {
+    "query": "restore a deleted file from git history",
+    "should_trigger": false
+  },
+  {
+    "query": "what's the difference between these two files?",
+    "should_trigger": false
+  },
+  {
+    "query": "configure a pre-commit hook for this project",
+    "should_trigger": false
+  }
+]

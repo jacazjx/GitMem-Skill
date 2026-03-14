@@ -1,0 +1,167 @@
+{
+  "skill_name": "gitmem-safe-editing",
+  "evals": [
+    {
+      "id": 1,
+      "name": "edit-with-auto-commit",
+      "prompt": "Edit the file test/sample.txt and change 'hello' to 'world'. Make sure this is tracked safely.",
+      "expected_output": "File is edited AND committed to .gitmem automatically",
+      "files": ["test/sample.txt"],
+      "setup_commands": [
+        "mkdir -p test",
+        "echo 'hello' > test/sample.txt"
+      ],
+      "assertions": [
+        {
+          "name": "file_content_changed",
+          "type": "file_contains",
+          "target": "test/sample.txt",
+          "expected": "world"
+        },
+        {
+          "name": "gitmem_commit_created",
+          "type": "command_output_contains",
+          "command": "git --git-dir=.gitmem/.git --work-tree=. log --oneline -1",
+          "expected": "agent(edit)"
+        },
+        {
+          "name": "gitmem_tracks_edited_file",
+          "type": "command_output_contains",
+          "command": "git --git-dir=.gitmem/.git --work-tree=. log --oneline -1 -- test/sample.txt",
+          "expected": "sample.txt"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "create-checkpoint",
+      "prompt": "Create a checkpoint called 'feature-complete' before we continue with more changes.",
+      "expected_output": "A gitmem tag gitmem-checkpoint-feature-complete is created",
+      "assertions": [
+        {
+          "name": "checkpoint_tag_exists",
+          "type": "command_succeeds",
+          "command": "git --git-dir=.gitmem/.git --work-tree=. tag -l 'gitmem-checkpoint-feature-complete'"
+        },
+        {
+          "name": "tag_message_informs_user",
+          "type": "output_contains",
+          "expected": "checkpoint"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "view-file-history",
+      "prompt": "Show me the edit history for test/sample.txt",
+      "expected_output": "Displays gitmem log for the file with commit IDs, messages, and timestamps",
+      "files": ["test/sample.txt"],
+      "assertions": [
+        {
+          "name": "shows_commit_info",
+          "type": "output_matches_pattern",
+          "pattern": "(commit|agent\\(edit\\)|[a-f0-9]{7})"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "rollback-single-file",
+      "prompt": "The last edit to test/sample.txt broke something. Roll it back to the previous version.",
+      "expected_output": "File is restored to previous version and a restoration commit is created",
+      "files": ["test/sample.txt"],
+      "setup_commands": [
+        "echo 'version1' > test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. add test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. commit -m 'agent(edit): test/sample.txt\n\nreason: initial'",
+        "echo 'version2_broken' > test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. add test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. commit -m 'agent(edit): test/sample.txt\n\nreason: update'"
+      ],
+      "assertions": [
+        {
+          "name": "file_restored",
+          "type": "file_contains",
+          "target": "test/sample.txt",
+          "expected": "version1"
+        },
+        {
+          "name": "restoration_committed",
+          "type": "command_output_contains",
+          "command": "git --git-dir=.gitmem/.git --work-tree=. log --oneline -1",
+          "expected": "agent(edit)"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "loop-guard-warning",
+      "prompt": "I've been editing test/sample.txt many times. Check if there's a problem.",
+      "expected_output": "Warns about repeated edits if the file appears in 5+ recent commits without checkpoint",
+      "files": ["test/sample.txt"],
+      "setup_commands": [
+        "for i in 1 2 3 4 5 6; do echo \"version$i\" > test/sample.txt; git --git-dir=.gitmem/.git --work-tree=. add test/sample.txt; git --git-dir=.gitmem/.git --work-tree=. commit -m \"agent(edit): test/sample.txt\n\nreason: iteration $i\"; done"
+      ],
+      "assertions": [
+        {
+          "name": "loop_guard_triggered",
+          "type": "output_matches_pattern",
+          "pattern": "(warning|checkpoint|stable|rollback|multiple|recent)"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "undo-last-change",
+      "prompt": "Undo your last gitmem change completely",
+      "expected_output": "The most recent gitmem commit is removed and files are reset",
+      "setup_commands": [
+        "echo 'before' > test/undo_test.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. add test/undo_test.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. commit -m 'agent(edit): test/undo_test.txt\n\nreason: test'"
+      ],
+      "assertions": [
+        {
+          "name": "last_commit_removed",
+          "type": "command_output_not_contains",
+          "command": "git --git-dir=.gitmem/.git --work-tree=. log --oneline -1",
+          "not_expected": "undo_test.txt"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "initialization-check",
+      "prompt": "Check if gitmem is initialized for this project",
+      "expected_output": "Reports whether .gitmem/.git exists and is a valid repository",
+      "assertions": [
+        {
+          "name": "reports_gitmem_status",
+          "type": "output_matches_pattern",
+          "pattern": "(gitmem|initialized|present|.gitmem)"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "diff-two-versions",
+      "prompt": "Compare the last two versions of test/sample.txt in gitmem",
+      "expected_output": "Shows diff between the two most recent commits for the file",
+      "setup_commands": [
+        "echo 'old content' > test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. add test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. commit -m 'agent(edit): test/sample.txt\n\nreason: old'",
+        "echo 'new content' > test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. add test/sample.txt",
+        "git --git-dir=.gitmem/.git --work-tree=. commit -m 'agent(edit): test/sample.txt\n\nreason: new'"
+      ],
+      "assertions": [
+        {
+          "name": "shows_diff_output",
+          "type": "output_matches_pattern",
+          "pattern": "(diff|-|\\+|old|new)"
+        }
+      ]
+    }
+  ]
+}

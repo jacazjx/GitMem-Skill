@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+#
+# gitmem-init - Initialize GitMem for a project
+#
+# Usage: gitmem-init [options]
+#
+# Options:
+#   --force    Force re-initialization even if .gitmem exists
+#   --verify   Verify the setup is correct
+#
+
+set -e
+
+GITMEM_DIR=".gitmem"
+GITMEM_GIT="${GITMEM_DIR}/.git"
+
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+FORCE=false
+VERIFY=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force|-f)
+            FORCE=true
+            shift
+            ;;
+        --verify)
+            VERIFY=true
+            shift
+            ;;
+        *)
+            echo "Unknown option: $1"
+            exit 1
+            ;;
+    esac
+done
+
+verify_gitmem() {
+    echo -e "${YELLOW}Verifying GitMem setup...${NC}"
+
+    local errors=0
+
+    # Check .gitmem directory exists
+    if [[ ! -d "$GITMEM_DIR" ]]; then
+        echo -e "${RED}✗ .gitmem directory not found${NC}"
+        ((errors++))
+    else
+        echo -e "${GREEN}✓ .gitmem directory exists${NC}"
+    fi
+
+    # Check .gitmem/.git exists
+    if [[ ! -d "$GITMEM_GIT" ]]; then
+        echo -e "${RED}✗ .gitmem/.git not found${NC}"
+        ((errors++))
+    else
+        echo -e "${GREEN}✓ .gitmem/.git repository exists${NC}"
+    fi
+
+    # Check it's a valid git repo
+    if git --git-dir="$GITMEM_GIT" status &>/dev/null; then
+        echo -e "${GREEN}✓ GitMem is a valid git repository${NC}"
+    else
+        echo -e "${RED}✗ GitMem is not a valid git repository${NC}"
+        ((errors++))
+    fi
+
+    # Check main .git exists (for comparison)
+    if [[ -d ".git" ]]; then
+        echo -e "${GREEN}✓ Main .git repository exists${NC}"
+    else
+        echo -e "${YELLOW}⚠ No main .git repository found (optional)${NC}"
+    fi
+
+    # Check .gitmem is in .gitignore (recommended)
+    if [[ -f ".gitignore" ]] && grep -q ".gitmem" .gitignore; then
+        echo -e "${GREEN}✓ .gitmem is in .gitignore${NC}"
+    else
+        echo -e "${YELLOW}⚠ Consider adding .gitmem to .gitignore${NC}"
+    fi
+
+    if [[ $errors -eq 0 ]]; then
+        echo ""
+        echo -e "${GREEN}✓ GitMem setup is correct!${NC}"
+        return 0
+    else
+        echo ""
+        echo -e "${RED}✗ GitMem has ${errors} error(s)${NC}"
+        return 1
+    fi
+}
+
+if $VERIFY; then
+    verify_gitmem
+    exit $?
+fi
+
+# Check if already initialized
+if [[ -d "$GITMEM_GIT" ]] && ! $FORCE; then
+    echo -e "${YELLOW}GitMem already initialized at ${GITMEM_DIR}/${NC}"
+    echo "Use --force to re-initialize"
+    verify_gitmem
+    exit 0
+fi
+
+# Force clean if requested
+if $FORCE && [[ -d "$GITMEM_DIR" ]]; then
+    echo -e "${YELLOW}Removing existing .gitmem...${NC}"
+    rm -rf "$GITMEM_DIR"
+fi
+
+# Initialize
+echo -e "${YELLOW}Initializing GitMem...${NC}"
+
+mkdir -p "$GITMEM_DIR"
+git init "$GITMEM_DIR"
+
+echo ""
+echo -e "${GREEN}✓ GitMem initialized at ${GITMEM_DIR}/${NC}"
+echo ""
+
+# Verify the setup
+verify_gitmem
+
+echo ""
+echo "GitMem is ready! Use these commands:"
+echo "  gitmem commit <file> <reason>   - Commit a file change"
+echo "  gitmem history <file>           - View file history"
+echo "  gitmem rollback <file>          - Restore previous version"
+echo "  gitmem checkpoint <name>        - Create a checkpoint"
+echo "  gitmem watch                    - Auto-monitor file changes"

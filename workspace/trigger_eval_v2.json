@@ -1,0 +1,154 @@
+[
+  {
+    "query": "edit my config.yaml and make sure I can undo if something goes wrong",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "帮我改一下src/main.py，要是改坏了能回滚",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "refactor the authentication module but keep a checkpoint in case we need to revert",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "I think your last edit broke the tests, show me what changed and let me restore the working version",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "这个文件你改了好几次了，每次都有问题，让我看看之前的版本",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "edit this file safely so I can compare versions later",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "go back to the version from 3 edits ago, the code was working then",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "create a safe checkpoint before you start refactoring the database layer",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "the agent keeps making changes that break things, how do I see recent edits and rollback?",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "undo your last change to package.json, it broke the build",
+    "should_trigger": true,
+    "type": "explicit"
+  },
+  {
+    "query": "修改 src/api.ts，添加重试逻辑",
+    "should_trigger": true,
+    "type": "implicit",
+    "note": "编辑请求，应自动触发gitmem commit"
+  },
+  {
+    "query": "update the README.md to reflect the new API changes",
+    "should_trigger": true,
+    "type": "implicit",
+    "note": "编辑请求，应自动触发gitmem commit"
+  },
+  {
+    "query": "fix the bug in utils.js where the null check is missing",
+    "should_trigger": true,
+    "type": "implicit",
+    "note": "编辑请求，应自动触发gitmem commit"
+  },
+  {
+    "query": "帮我改一下配置文件，把端口改成8080",
+    "should_trigger": true,
+    "type": "implicit",
+    "note": "编辑请求，应自动触发gitmem commit"
+  },
+  {
+    "query": "refactor the User class to use composition instead of inheritance",
+    "should_trigger": true,
+    "type": "implicit",
+    "note": "重构请求，应自动触发gitmem commit"
+  },
+  {
+    "query": "commit these changes to git with a descriptive message",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "普通git操作，非gitmem"
+  },
+  {
+    "query": "show me the git log for this repository",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "普通git操作"
+  },
+  {
+    "query": "create a new branch called feature/auth and push it to origin",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "普通git操作"
+  },
+  {
+    "query": "merge the develop branch into main",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "普通git操作"
+  },
+  {
+    "query": "帮我看看这个bug怎么修，代码在这里",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "代码分析，不涉及编辑"
+  },
+  {
+    "query": "review my code and suggest improvements",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "代码审查，不涉及编辑"
+  },
+  {
+    "query": "write a unit test for the calculate function",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "创建新文件，非编辑现有文件"
+  },
+  {
+    "query": "restore a deleted file from git history",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "使用主仓库git，非gitmem"
+  },
+  {
+    "query": "what's the difference between these two files?",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "文件比较，非版本比较"
+  },
+  {
+    "query": "configure a pre-commit hook for this project",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "配置任务"
+  },
+  {
+    "query": "create a new file called helpers.js",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "创建新文件，非编辑现有文件"
+  },
+  {
+    "query": "delete the old migration files",
+    "should_trigger": false,
+    "type": "negative",
+    "note": "删除操作，非编辑"
+  }
+]

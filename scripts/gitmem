@@ -1,0 +1,309 @@
+#!/usr/bin/env bash
+#
+# gitmem - GitMem Safe Editing Command Line Tool
+#
+# Usage: gitmem <command> [options]
+#
+# Commands:
+#   init              Initialize .gitmem repository
+#   commit <file>     Commit a single file with reason
+#   history <file>    Show edit history for a file
+#   diff <file>       Show diff between last two versions
+#   rollback <file>   Roll back a file to previous version
+#   undo              Undo the last gitmem change
+#   checkpoint <name> Create a checkpoint tag
+#   status            Show gitmem status
+#   watch             Start file watcher for auto-commit
+#   check-loop <file> Check if loop guard should trigger
+#
+
+set -e
+
+GITMEM_DIR=".gitmem"
+GITMEM_GIT="${GITMEM_DIR}/.git"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+gitmem_cmd() {
+    git --git-dir="${GITMEM_GIT}" --work-tree=. "$@"
+}
+
+check_gitmem_exists() {
+    if [[ ! -d "${GITMEM_GIT}" ]]; then
+        echo -e "${RED}Error: GitMem not initialized. Run 'gitmem init' first.${NC}"
+        exit 1
+    fi
+}
+
+cmd_init() {
+    if [[ -d "${GITMEM_GIT}" ]]; then
+        echo -e "${YELLOW}GitMem already initialized at ${GITMEM_DIR}/${NC}"
+        return 0
+    fi
+
+    mkdir -p "${GITMEM_DIR}"
+    git init "${GITMEM_DIR}"
+    echo -e "${GREEN}✓ GitMem initialized at ${GITMEM_DIR}/${NC}"
+    gitmem_cmd status
+}
+
+cmd_commit() {
+    check_gitmem_exists
+
+    local file="$1"
+    local reason="${2:-no reason provided}"
+
+    if [[ -z "$file" ]]; then
+        echo -e "${RED}Error: No file specified${NC}"
+        echo "Usage: gitmem commit <file> [reason]"
+        exit 1
+    fi
+
+    if [[ ! -f "$file" ]]; then
+        echo -e "${RED}Error: File not found: ${file}${NC}"
+        exit 1
+    fi
+
+    gitmem_cmd add -- "$file"
+    gitmem_cmd commit -m "agent(edit): ${file}
+
+reason: ${reason}"
+
+    echo -e "${GREEN}✓ Committed ${file} to GitMem${NC}"
+}
+
+cmd_history() {
+    check_gitmem_exists
+
+    local file="$1"
+
+    if [[ -z "$file" ]]; then
+        echo -e "${YELLOW}Recent GitMem commits:${NC}"
+        gitmem_cmd log --oneline -10
+    else
+        echo -e "${YELLOW}GitMem history for ${file}:${NC}"
+        gitmem_cmd log -- "$file"
+    fi
+}
+
+cmd_diff() {
+    check_gitmem_exists
+
+    local file="$1"
+
+    if [[ -z "$file" ]]; then
+        echo -e "${RED}Error: No file specified${NC}"
+        echo "Usage: gitmem diff <file>"
+        exit 1
+    fi
+
+    # Get last two commits for the file
+    local commits
+    commits=$(gitmem_cmd log --format="%H" -2 -- "$file")
+
+    if [[ -z "$commits" ]]; then
+        echo -e "${YELLOW}No history found for ${file}${NC}"
+        exit 0
+    fi
+
+    local commit_a commit_b
+    commit_b=$(echo "$commits" | head -1)
+    commit_a=$(echo "$commits" | tail -1)
+
+    echo -e "${YELLOW}Diff for ${file} (${commit_a:0:7}..${commit_b:0:7}):${NC}"
+    gitmem_cmd diff "${commit_a}" "${commit_b}" -- "$file"
+}
+
+cmd_rollback() {
+    check_gitmem_exists
+
+    local file="$1"
+    local target="${2:-HEAD~1}"
+
+    if [[ -z "$file" ]]; then
+        echo -e "${RED}Error: No file specified${NC}"
+        echo "Usage: gitmem rollback <file> [commit]"
+        exit 1
+    fi
+
+    echo -e "${YELLOW}Rolling back ${file} to ${target}...${NC}"
+    gitmem_cmd checkout "${target}" -- "$file"
+
+    # Commit the restoration
+    gitmem_cmd add -- "$file"
+    gitmem_cmd commit -m "agent(edit): ${file}
+
+reason: restored from ${target}"
+
+    echo -e "${GREEN}✓ Rolled back ${file}${NC}"
+}
+
+cmd_undo() {
+    check_gitmem_exists
+
+    echo -e "${YELLOW}Undoing last GitMem change...${NC}"
+    gitmem_cmd reset --hard HEAD~1
+    echo -e "${GREEN}✓ Last change undone${NC}"
+}
+
+cmd_checkpoint() {
+    check_gitmem_exists
+
+    local name="$1"
+
+    if [[ -z "$name" ]]; then
+        echo -e "${RED}Error: No checkpoint name specified${NC}"
+        echo "Usage: gitmem checkpoint <name>"
+        exit 1
+    fi
+
+    local tag_name="gitmem-checkpoint-${name}"
+    gitmem_cmd tag "$tag_name"
+    echo -e "${GREEN}✓ Checkpoint created: ${tag_name}${NC}"
+}
+
+cmd_status() {
+    check_gitmem_exists
+
+    echo -e "${BLUE}GitMem Status:${NC}"
+    echo ""
+    gitmem_cmd status --short
+    echo ""
+    echo -e "${BLUE}Recent commits:${NC}"
+    gitmem_cmd log --oneline -5
+    echo ""
+    echo -e "${BLUE}Checkpoints:${NC}"
+    gitmem_cmd tag -l "gitmem-checkpoint-*" | sed 's/gitmem-checkpoint-/  - /'
+}
+
+cmd_watch() {
+    check_gitmem_exists
+
+    echo -e "${GREEN}Starting GitMem file watcher...${NC}"
+    echo -e "${YELLOW}Monitoring for file changes. Press Ctrl+C to stop.${NC}"
+    echo ""
+
+    # Check for inotifywait
+    if ! command -v inotifywait &> /dev/null; then
+        echo -e "${RED}Error: inotifywait not found.${NC}"
+        echo "Install with: sudo apt-get install inotify-tools"
+        echo ""
+        echo "Alternative for macOS: brew install fswatch"
+        exit 1
+    fi
+
+    # Watch for modify events, excluding .git and .gitmem directories
+    inotifywait -m -r -e modify,create \
+        --exclude "\.git|\.gitmem|__pycache__|node_modules|\.pyc$|\.swp$|~$" \
+        . 2>/dev/null | while read -r dir event file; do
+
+        local full_path="${dir}${file}"
+
+        # Skip directories
+        [[ -d "$full_path" ]] && continue
+
+        echo -e "${GREEN}Change detected: ${full_path}${NC}"
+
+        # Auto-commit the change
+        gitmem_cmd add -- "$full_path" 2>/dev/null
+        gitmem_cmd commit -m "agent(edit): ${full_path}
+
+reason: auto-detected file change" 2>/dev/null
+
+        if [[ $? -eq 0 ]]; then
+            echo -e "${GREEN}✓ Auto-committed to GitMem${NC}"
+        fi
+    done
+}
+
+cmd_check_loop() {
+    check_gitmem_exists
+
+    local file="$1"
+    local threshold="${2:-5}"
+
+    if [[ -z "$file" ]]; then
+        echo -e "${RED}Error: No file specified${NC}"
+        echo "Usage: gitmem check-loop <file> [threshold]"
+        exit 1
+    fi
+
+    # Count commits for this file in recent history
+    local count
+    count=$(gitmem_cmd log --oneline -${threshold} -- "$file" 2>/dev/null | wc -l)
+
+    # Check for checkpoint
+    local has_checkpoint
+    has_checkpoint=$(gitmem_cmd tag -l "gitmem-checkpoint-*" | wc -l)
+
+    if [[ $count -ge $threshold ]] && [[ $has_checkpoint -eq 0 ]]; then
+        echo -e "${YELLOW}⚠ Loop Guard Warning!${NC}"
+        echo ""
+        echo "File '${file}' has been modified ${count} times recently without a stable checkpoint."
+        echo "Consider:"
+        echo "  1. Restoring a previous stable version: gitmem rollback ${file}"
+        echo "  2. Creating a checkpoint: gitmem checkpoint <name>"
+        echo ""
+        echo "Recent commits for this file:"
+        gitmem_cmd log --oneline -${threshold} -- "$file"
+        exit 2
+    else
+        echo -e "${GREEN}✓ No loop detected (${count}/${threshold} recent commits)${NC}"
+    fi
+}
+
+# Main command router
+case "${1:-}" in
+    init)
+        cmd_init
+        ;;
+    commit)
+        cmd_commit "$2" "$3"
+        ;;
+    history)
+        cmd_history "$2"
+        ;;
+    diff)
+        cmd_diff "$2"
+        ;;
+    rollback)
+        cmd_rollback "$2" "$3"
+        ;;
+    undo)
+        cmd_undo
+        ;;
+    checkpoint)
+        cmd_checkpoint "$2"
+        ;;
+    status)
+        cmd_status
+        ;;
+    watch)
+        cmd_watch
+        ;;
+    check-loop)
+        cmd_check_loop "$2" "$3"
+        ;;
+    *)
+        echo "GitMem Safe Editing Tool"
+        echo ""
+        echo "Usage: gitmem <command> [options]"
+        echo ""
+        echo "Commands:"
+        echo "  init              Initialize .gitmem repository"
+        echo "  commit <file> [r] Commit a file with reason"
+        echo "  history [file]    Show edit history"
+        echo "  diff <file>       Show diff between last two versions"
+        echo "  rollback <file>   Roll back a file"
+        echo "  undo              Undo last gitmem change"
+        echo "  checkpoint <name> Create a checkpoint tag"
+        echo "  status            Show gitmem status"
+        echo "  watch             Start file watcher for auto-commit"
+        echo "  check-loop <file> Check for edit loop warning"
+        ;;
+esac

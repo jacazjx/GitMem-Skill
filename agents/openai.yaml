@@ -1,0 +1,5 @@
+interface:
+  display_name: GitMem Safe Editing
+  short_description: Pure Git safety layer for agent code edits
+policy:
+  allow_implicit_invocation: true
