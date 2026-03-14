@@ -35,6 +35,53 @@ project/
     .git/
 ```
 
+## Auto-initialization on skill activation
+
+When this skill is triggered, **you MUST immediately execute these commands** using the Bash tool:
+
+### Step 1: Check initialization status
+
+Run this command to check if GitMem is initialized:
+
+```bash
+test -d .gitmem/.git && echo "initialized" || echo "not initialized"
+```
+
+**You MUST run this command and check the output.** If it outputs "not initialized", proceed to Step 2.
+
+### Step 2: Auto-initialize if needed
+
+If GitMem is not initialized, **MUST run these commands**:
+
+```bash
+mkdir -p .gitmem
+git init .gitmem
+git --git-dir=.gitmem/.git --work-tree=. config user.email "agent@gitmem.local"
+git --git-dir=.gitmem/.git --work-tree=. config user.name "GitMem Agent"
+```
+
+Then inform the user: "GitMem initialized at `.gitmem/`"
+
+### Step 3: Start auto-watch mode
+
+**MUST run these commands** to start the file watcher:
+
+```bash
+# Check if watch is already running, if not start it in background
+if ! pgrep -f "gitmem-watch" > /dev/null 2>&1; then
+  # Find the watch script
+  WATCH_SCRIPT="$(find ~/.claude/skills -name 'gitmem-watch' 2>/dev/null | head -1)"
+  if [ -x "$WATCH_SCRIPT" ]; then
+    nohup "$WATCH_SCRIPT" > /tmp/gitmem-watch.log 2>&1 &
+    disown
+  fi
+fi
+```
+
+Then inform the user: "GitMem auto-watch started - all file changes will be automatically tracked"
+
+**Note:** If `inotify-tools` (Linux) or `fswatch` (macOS) is not installed, inform the user: "Auto-watch requires `inotify-tools` (Linux) or `fswatch` (macOS). Please install for automatic tracking, or manually commit changes using `gitmem commit <file>`."
+
 ## Required edit workflow
 
 For every edited file, follow this sequence:
@@ -59,19 +106,6 @@ git --git-dir=.gitmem/.git --work-tree=. <command>
 ```
 
 Run commands from the project root unless the user explicitly specifies another path.
-
-## Initialization workflow
-
-When `.gitmem/.git` does not exist, initialize GitMem before any tracked edit:
-
-```bash
-mkdir -p .gitmem
-git init .gitmem
-git --git-dir=.gitmem/.git --work-tree=. status
-```
-
-Initialization creates the agent edit log repository only.
-Do not modify the user's main `.git` state during setup.
 
 ## Core operations
 
@@ -230,8 +264,9 @@ Inspect recent history, compare versions, and recommend rollback or checkpointin
 
 Use this quick routing logic:
 
-- **new code edit request** → edit file, then GitMem-commit that file immediately
-- **user says `the previous version was better`** → inspect file history, diff likely candidates, roll back the file, then commit the restoration
+- **skill triggered / user says `use gitmem`** → check if `.gitmem/.git` exists, auto-initialize if needed, then start auto-watch mode
+- **new code edit request** → edit file (auto-watch will commit changes automatically)
+- **user says `the previous version was better`** → inspect file history, diff likely candidates, roll back the file (auto-watch will commit the restoration)
 - **user says `go back a few steps`** → inspect recent changes, then time-travel or undo depending on scope
 - **agent is unsure whether a fix helped or harmed** → diff recent commits before editing again
 - **user confirms a version works** → create a checkpoint
@@ -243,6 +278,7 @@ When using this skill, be explicit about safety state.
 Briefly tell the user:
 
 - whether GitMem was initialized or already present
+- whether auto-watch mode was started or already running
 - which file or commit you are operating on
 - whether you created a commit, checkpoint, rollback, undo, or time-travel action
 - when loop guard warnings apply

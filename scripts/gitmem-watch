@@ -230,13 +230,27 @@ watch_inotify() {
     log_info "Monitoring for file changes... (Ctrl+C to stop)"
     echo ""
 
-    inotifywait -m -r -e modify,create,close_write \
+    # Also monitor moved_to events (for temp file renames) and delete events
+    inotifywait -m -r -e modify,create,close_write,moved_to \
         --exclude "$EXCLUDE_PATTERN" \
         . 2>/dev/null | while read -r dir event file; do
 
         local full_path="${dir}${file}"
         log_debug "Event: $event on $full_path"
-        add_pending "$full_path"
+
+        # Handle temp file patterns - if file matches .tmp.* pattern,
+        # extract the base filename and commit that instead
+        if echo "$file" | grep -qE '\.tmp\.[0-9]+\.[0-9]+$'; then
+            # This is a temp file, extract the base name
+            local base_file=$(echo "$file" | sed -E 's/\.tmp\.[0-9]+\.[0-9]+$//')
+            full_path="${dir}${base_file}"
+            log_debug "Detected temp file, will commit base file: $full_path"
+        fi
+
+        # Only commit if the file exists (not deleted)
+        if [[ -f "$full_path" ]]; then
+            add_pending "$full_path"
+        fi
     done
 }
 
@@ -246,11 +260,23 @@ watch_fswatch() {
     echo ""
 
     fswatch -r --exclude "$EXCLUDE_PATTERN" \
-        --event Changed --event Created \
+        --event Changed --event Created --event Renamed \
         . 2>/dev/null | while read -r file; do
 
         log_debug "Changed: $file"
-        add_pending "$file"
+
+        # Handle temp file patterns - if file matches .tmp.* pattern,
+        # extract the base filename and commit that instead
+        if echo "$file" | grep -qE '\.tmp\.[0-9]+\.[0-9]+$'; then
+            local base_file=$(echo "$file" | sed -E 's/\.tmp\.[0-9]+\.[0-9]+$//')
+            file="$base_file"
+            log_debug "Detected temp file, will commit base file: $file"
+        fi
+
+        # Only commit if the file exists
+        if [[ -f "$file" ]]; then
+            add_pending "$file"
+        fi
     done
 }
 

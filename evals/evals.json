@@ -143,23 +143,36 @@
       ]
     },
     {
-      "id": 8,
-      "name": "diff-two-versions",
-      "prompt": "Compare the last two versions of test/sample.txt in gitmem",
-      "expected_output": "Shows diff between the two most recent commits for the file",
+      "id": 9,
+      "name": "auto-initialization-and-watch",
+      "prompt": "Use gitmem for safe editing. I need to edit this file.",
+      "expected_output": "GitMem should auto-initialize if not present AND start auto-watch mode automatically",
+      "files": ["test/auto_init.txt"],
       "setup_commands": [
-        "echo 'old content' > test/sample.txt",
-        "git --git-dir=.gitmem/.git --work-tree=. add test/sample.txt",
-        "git --git-dir=.gitmem/.git --work-tree=. commit -m 'agent(edit): test/sample.txt\n\nreason: old'",
-        "echo 'new content' > test/sample.txt",
-        "git --git-dir=.gitmem/.git --work-tree=. add test/sample.txt",
-        "git --git-dir=.gitmem/.git --work-tree=. commit -m 'agent(edit): test/sample.txt\n\nreason: new'"
+        "rm -rf .gitmem",
+        "mkdir -p test",
+        "echo 'initial content' > test/auto_init.txt"
       ],
       "assertions": [
         {
-          "name": "shows_diff_output",
-          "type": "output_matches_pattern",
-          "pattern": "(diff|-|\\+|old|new)"
+          "name": "gitmem_directory_created",
+          "type": "command_succeeds",
+          "command": "test -d .gitmem/.git"
+        },
+        {
+          "name": "auto_watch_started",
+          "type": "command_succeeds",
+          "command": "pgrep -f 'gitmem-watch' > /dev/null"
+        },
+        {
+          "name": "informs_user_of_initialization",
+          "type": "output_contains",
+          "expected": "initialized"
+        },
+        {
+          "name": "informs_user_of_auto_watch",
+          "type": "output_contains",
+          "expected": "watch"
         }
       ]
     }
