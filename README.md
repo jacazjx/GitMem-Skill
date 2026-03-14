@@ -1,5 +1,7 @@
 # GitMem Safe Editing
 
+[简体中文](README_CN.md) | English
+
 A skill for AI code agents that provides safe, traceable, and reversible file editing using a separate `.gitmem` repository as an edit safety layer.
 
 ## The Problem
